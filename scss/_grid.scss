@@ -1,0 +1,130 @@
+// thông số liên quan tới break-point
+// dimension độ rông từng break-point
+// container , row, column , v.v
+
+// lấy math của sass vào
+@use "sass:math";
+
+//thông số  của break-point
+$grid-breakpoints: (
+    xs: 0,
+    sm: 576px,
+    md: 768px,
+    lg: 992px,
+    xl: 1200px,
+    xxl: 1400px,
+);
+
+// độ rộng tối đa của container tương ứng với từng break-point
+$container-max-widths: (
+    sm: 540px,
+    md: 720px,
+    lg: 960px,
+    xl: 1140px,
+    xxl: 1320px,
+);
+
+//số cột grid-columns
+$grid-columns: 12;
+// gutter khoảng cách giữa các cột
+$grid-gutter-width: 30px;
+
+// tránh lập code
+%gutter-padding {
+    padding-left: $grid-gutter-width * 0.5;
+    padding-right: $grid-gutter-width * 0.5;
+}
+
+// lấy tham số thứ nhất $map: $container-max-widths
+// lấy tham số thứ 2 $key: xxl
+// @debug map-get($map: $container-max-widths, $key: xxl);
+
+//viết cho container-fluid  rồi container kế thừa lại
+.container-fluid {
+    width: 100%;
+    //căn giữa
+    margin-left: auto;
+    margin-right: auto;
+    //padding trái và phải bằng 1 nửa gutter
+    // extend kế thừa lại gutter-padding
+    @extend %gutter-padding;
+}
+
+//viết cho container-fluid  rồi container kế thừa lại
+//lúc này container kế thừa lại container-fluid
+.container {
+    @extend .container-fluid;
+}
+
+// ROW
+.row {
+    display: flex;
+    //khi độ rộng cột vượt quá 100% thì nó phải xuống hàng được nên dùng
+    // flex-wrap: wrap;
+    flex-wrap: wrap;
+
+    //Tổng khoảng cách của các cột vượt quá chiều rộng của .row:
+
+    // Khi các cột trong .row cộng dồn các padding (từ gutter), chiều rộng thực tế của nội dung trong .row sẽ lớn hơn chiều rộng của chính .row.
+    // Điều này gây ra hiện tượng tràn nội dung ra ngoài vùng chứa (container).
+    // Giải pháp bù đắp với margin âm:
+
+    // Để bù cho phần padding thêm từ các cột (padding-left và padding-right), bạn áp dụng margin-left và margin-right với giá trị âm bằng nửa kích thước gutter (-$grid-gutter-width * 0.5).
+    // Việc này kéo nội dung của .row vào trong, để các cột con được căn chỉnh đúng với cạnh ngoài của vùng chứa (.container).
+    // row cũng phải có giá trị margin left và right âm
+    // để bù lại gutter của column
+    margin-left: -$grid-gutter-width * 0.5;
+    margin-right: -$grid-gutter-width * 0.5;
+
+    [class*="col-"] {
+        // flex : grow 0, shrink 0; basis auto;
+        flex: 0 0 auto;
+        @extend %gutter-padding;
+    }
+}
+
+.col {
+    // flex: 1 0; 1 là grow; 0 là shrink
+    flex: 1 0;
+    @extend %gutter-padding;
+}
+
+//tạo ra media query dựa vào thông số break-point
+//chúng ta sẽ dùng each để duyệt qua nó
+
+// Ưu điểm của @content:
+// content là một tính năng mạnh mẽ dùng trong mixin để cho phép chèn nội dung tùy chỉnh vào nơi mà @content được gọi
+// Tái sử dụng mã: Mixin make-media-query có thể được dùng cho nhiều loại nội dung khác nhau.
+//  Tính linh hoạt: Dễ dàng thay đổi nội dung CSS bên trong khối media query mà không cần chỉnh sửa mixin gốc.
+// Đơn giản hóa cấu trúc: Giảm sự lặp lại và làm mã nguồn dễ đọc hơn.
+// Với @content, bạn không bị giới hạn bởi các quy tắc CSS cố định mà mixin tạo ra. Thay vào đó, bạn có thể tùy chỉnh chúng một cách dễ dàng
+@mixin make-media-query($dimension) {
+    @media (min-width: $dimension) {
+        @content;
+    }
+}
+
+//xs, sm, md, lg, xl, xxl gọi là $breakpoint.
+// 576px, 768px, 992px, 1200px,1400px gọi là $dimension
+@each $breakpoint, $dimension in $grid-breakpoints {
+    $max-width: map-get($container-max-widths, $breakpoint);
+
+    //chúng ta sẽ kiểm tra nếu có XS thì k nối infix vào nữa
+    // nếu mà $breakpoint bằng với XS thì trả ra chuổi rổng " "
+    // còn nếu $breakpoint khác với XS thì trả gạch ngang nối với $breakpoint đó
+    $infix: if($breakpoint == xs, "", "-#{$breakpoint}");
+
+    @include make-media-query($dimension) {
+        .container {
+            max-width: $max-width;
+        }
+
+        @for $i from 1 through $grid-columns {
+            .col#{$infix}-#{$i} {
+                //100% chia cho số cột là $grid-columns nhân với đô la i
+                width: math.div(100%, $grid-columns) * $i;
+                background: green;
+            }
+        }
+    }
+}
