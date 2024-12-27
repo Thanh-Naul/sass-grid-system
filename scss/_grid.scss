@@ -25,14 +25,24 @@ $container-max-widths: (
 );
 
 //số cột grid-columns
-$grid-columns: 12;
+$grid-columns: 12 !default;
 // gutter khoảng cách giữa các cột
-$grid-gutter-width: 30px;
+$grid-gutter-width: 30px !default;
+// tính khoảng cách gutter
+// thì lấy $grid-gutter-width * với tham số gutter ở dưới
+$gutters: (
+    0: 0,
+    1: 0.25,
+    2: 0.5,
+    3: 1,
+    4: 1.5,
+    5: 3,
+);
 
 // tránh lập code
 %gutter-padding {
-    padding-left: $grid-gutter-width * 0.5;
-    padding-right: $grid-gutter-width * 0.5;
+    padding-left: calc(var(--grid-gutter-x) * 0.5);
+    padding-right: calc(var(--grid-gutter-x) * 0.5);
 }
 
 // lấy tham số thứ nhất $map: $container-max-widths
@@ -41,6 +51,12 @@ $grid-gutter-width: 30px;
 
 //viết cho container-fluid  rồi container kế thừa lại
 .container-fluid {
+    //tạo biến và dùng nội suy để lấy được giá trị của biến
+    --grid-gutter-x: #{$grid-gutter-width};
+    // ít dùng  #{$grid-gutter-width} gutter y nên để nó = 0
+    //chỉ khi tạo khoảng cách giữa các hàng mới dùng
+    --grid-gutter-y: 0;
+
     width: 100%;
     //căn giữa
     margin-left: auto;
@@ -62,7 +78,7 @@ $grid-gutter-width: 30px;
     //khi độ rộng cột vượt quá 100% thì nó phải xuống hàng được nên dùng
     // flex-wrap: wrap;
     flex-wrap: wrap;
-
+    margin-top: calc(var(--grid-gutter-y) * -1);
     //Tổng khoảng cách của các cột vượt quá chiều rộng của .row:
 
     // Khi các cột trong .row cộng dồn các padding (từ gutter), chiều rộng thực tế của nội dung trong .row sẽ lớn hơn chiều rộng của chính .row.
@@ -73,12 +89,14 @@ $grid-gutter-width: 30px;
     // Việc này kéo nội dung của .row vào trong, để các cột con được căn chỉnh đúng với cạnh ngoài của vùng chứa (.container).
     // row cũng phải có giá trị margin left và right âm
     // để bù lại gutter của column
-    margin-left: -$grid-gutter-width * 0.5;
-    margin-right: -$grid-gutter-width * 0.5;
+    margin-left: calc(var(--grid-gutter-x) * 0.5 * -1);
+    margin-right: calc(var(--grid-gutter-x) * 0.5 * -1);
 
-    [class*="col-"] {
-        // flex : grow 0, shrink 0; basis auto;
-        flex: 0 0 auto;
+    // tác đông row thông qua thẻ con trực tiếp của row
+    > * {
+        // nó sẽ bị dư margin top ở các item đầu tiên
+        // nên thêm margin-top âm vào row
+        margin-top: var(--grid-gutter-y);
         @extend %gutter-padding;
     }
 }
@@ -86,7 +104,6 @@ $grid-gutter-width: 30px;
 .col {
     // flex: 1 0; 1 là grow; 0 là shrink
     flex: 1 0;
-    @extend %gutter-padding;
 }
 
 //tạo ra media query dựa vào thông số break-point
@@ -98,9 +115,66 @@ $grid-gutter-width: 30px;
 //  Tính linh hoạt: Dễ dàng thay đổi nội dung CSS bên trong khối media query mà không cần chỉnh sửa mixin gốc.
 // Đơn giản hóa cấu trúc: Giảm sự lặp lại và làm mã nguồn dễ đọc hơn.
 // Với @content, bạn không bị giới hạn bởi các quy tắc CSS cố định mà mixin tạo ra. Thay vào đó, bạn có thể tùy chỉnh chúng một cách dễ dàng
-@mixin make-media-query($dimension) {
-    @media (min-width: $dimension) {
+// $bypass: false giá trị mặc định là false
+@mixin make-media-query($dimension, $bypass: false) {
+    @if $bypass {
         @content;
+    } @else {
+        @media (min-width: $dimension) {
+            @content;
+        }
+    }
+}
+
+@mixin make-row-columns($infix) {
+    // thằng này nó sẽ ưu tiên hơn
+    // $grid-columns là 12 nhân với 0.5 là 6
+    @for $i from 1 through $grid-columns * 0.5 {
+        // > * tác động trực tiếp các thẻ con của selector trong row
+        .row-cols#{$infix}-#{$i} > * {
+            //100% chia cho số cột là $grid-columns nhân với đô la i
+            width: math.div(100%, $i);
+            // flex : grow 0, shrink 0; basis auto;
+            flex: 0 0 auto;
+        }
+    }
+}
+
+@mixin make-columns($infix) {
+    @for $i from 1 through $grid-columns {
+        .col#{$infix}-#{$i} {
+            // flex : grow 0, shrink 0; basis auto;
+            flex: 0 0 auto;
+            //100% chia cho số cột là $grid-columns nhân với đô la i
+            width: math.div(100%, $grid-columns) * $i;
+        }
+    }
+}
+
+@mixin make-offsets($infix) {
+    //chạy tới gần cuối dùng to
+    @for $i from 0 to $grid-columns {
+        .offset#{$infix}-#{$i} {
+            //100% chia cho số cột là $grid-columns nhân với đô la i
+            // if nếu i lớn hơn 0 thì sẽ chạy giá trị math.div(100%, $grid-columns) * $i
+            // if nếu i = 0 thì trả giá trị 0 không có đơn vị
+            margin-left: if($i > 0, math.div(100%, $grid-columns) * $i, 0);
+        }
+    }
+}
+
+//gutter
+@mixin make-gutter($infix) {
+    @each $i, $ratio in $gutters {
+        .g#{$infix}-#{$i},
+        .gx#{$infix}-#{$i} {
+            --grid-gutter-x: #{$grid-gutter-width * $ratio};
+        }
+
+        .g#{$infix}-#{$i},
+        .gy#{$infix}-#{$i} {
+            --grid-gutter-y: #{$grid-gutter-width * $ratio};
+        }
     }
 }
 
@@ -112,19 +186,25 @@ $grid-gutter-width: 30px;
     //chúng ta sẽ kiểm tra nếu có XS thì k nối infix vào nữa
     // nếu mà $breakpoint bằng với XS thì trả ra chuổi rổng " "
     // còn nếu $breakpoint khác với XS thì trả gạch ngang nối với $breakpoint đó
-    $infix: if($breakpoint == xs, "", "-#{$breakpoint}");
+    $is-xs: $breakpoint == xs;
+    $infix: if($is-xs, "", "-#{$breakpoint}");
 
-    @include make-media-query($dimension) {
+    @include make-media-query($dimension, $is-xs) {
         .container {
             max-width: $max-width;
         }
+        //row-cols-
+        @include make-row-columns($infix);
 
-        @for $i from 1 through $grid-columns {
-            .col#{$infix}-#{$i} {
-                //100% chia cho số cột là $grid-columns nhân với đô la i
-                width: math.div(100%, $grid-columns) * $i;
-                background: green;
-            }
-        }
+        //col-
+        @include make-columns($infix);
+
+        //ofsets
+        @include make-offsets($infix);
+
+        //gutter
+        @include make-gutter($infix);
     }
 }
+
+/// row-col-*, offset-*, g-*, gx-*, gy-*
